@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Activity, Bluetooth, BluetoothOff, Hand, Waves, TrendingUp, TrendingDown, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Activity, Bluetooth, BluetoothOff, Hand, Waves, TrendingUp, TrendingDown, ArrowLeft, ArrowRight, RotateCw, RotateCcw } from 'lucide-react';
 
 const GestureVisualizer = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -24,7 +24,9 @@ const GestureVisualizer = () => {
     3: <ArrowLeft className="w-12 h-12" />,
     4: <ArrowRight className="w-12 h-12" />,
     5: <TrendingUp className="w-12 h-12" />,
-    6: <TrendingDown className="w-12 h-12" />
+    6: <TrendingDown className="w-12 h-12" />,
+    7: <RotateCw className="w-12 h-12" />,
+    8: <RotateCcw className="w-12 h-12" />
   };
 
   const gestureColors = {
@@ -34,7 +36,9 @@ const GestureVisualizer = () => {
     3: 'from-purple-500 to-pink-600',
     4: 'from-green-500 to-emerald-600',
     5: 'from-yellow-500 to-amber-600',
-    6: 'from-indigo-500 to-purple-600'
+    6: 'from-indigo-500 to-purple-600',
+    7: 'from-teal-500 to-cyan-600',
+    8: 'from-rose-500 to-pink-600'
   };
 
   const connectBLE = async () => {
