@@ -11,6 +11,12 @@ A React web application that connects to an ESP32 device via Web Bluetooth to vi
   - MPU6050 Gyroscope (X, Y, Z axes)
 - **Gesture Recognition**: Displays current gesture with visual indicators
 - **Gesture History**: Shows the last 10 detected gestures with timestamps
+- **Machine Learning Integration**:
+  - Train custom gesture classification models using TensorFlow.js
+  - Toggle between ESP32 detection and ML prediction
+  - Real-time ML confidence scores
+  - Model persistence using IndexedDB
+  - Interactive training interface for data collection
 - **Modern UI**: Beautiful gradient-based interface with smooth animations
 
 ## Prerequisites
@@ -57,7 +63,7 @@ id:name|f1,f2,ax,ay,az,gx,gy,gz
 ```
 
 Where:
-- `id`: Gesture ID (0-6)
+- `id`: Gesture ID (0-8)
 - `name`: Gesture name (IDLE, FIST, OPEN_HAND, etc.)
 - `f1, f2`: Flex sensor values
 - `ax, ay, az`: Accelerometer values
@@ -72,6 +78,50 @@ Where:
 - **4**: WAVE_RIGHT
 - **5**: TILT_UP
 - **6**: TILT_DOWN
+- **7**: TILT_RIGHT
+- **8**: TILT_LEFT
+
+## Machine Learning Features
+
+### Training Your Model
+
+1. **Connect to ESP32**: Make sure your device is connected and sending sensor data
+2. **Open Trainer**: Click "Show Trainer" button in the header
+3. **Record Gestures**:
+   - Select a gesture from the dropdown
+   - Click "Start Recording" and perform the gesture
+   - The system will collect sensor data samples (10 samples per second)
+   - Click "Stop Recording" when done
+   - Repeat for all gestures you want to train
+4. **Train Model**: 
+   - Ensure you have at least 10 samples total
+   - Click "Train Model" to start training
+   - Training progress will be displayed in real-time
+   - Model is automatically saved to IndexedDB after training
+5. **Use ML Prediction**: 
+   - Toggle the ML switch in the header to enable ML predictions
+   - The system will use ML predictions when confidence > 50%
+
+### ML Model Architecture
+
+- **Input**: 8 features (flex1, flex2, ax, ay, az, gx, gy, gz)
+- **Architecture**: 
+  - Dense layer (64 units, ReLU)
+  - Dropout (20%)
+  - Dense layer (32 units, ReLU)
+  - Dropout (20%)
+  - Output layer (9 units, Softmax)
+- **Training**: 50 epochs with 20% validation split
+- **Optimizer**: Adam
+- **Loss**: Categorical Crossentropy
+
+### Tips for Better ML Accuracy
+
+- Collect at least 20-30 samples per gesture
+- Perform gestures consistently during recording
+- Record gestures in different orientations/positions
+- Train with diverse sensor readings
+- Review training statistics before training
 
 ## Build for Production
 

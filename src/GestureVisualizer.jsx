@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Activity, Bluetooth, BluetoothOff, Hand, Waves, TrendingUp, TrendingDown, ArrowLeft, ArrowRight, RotateCw, RotateCcw } from 'lucide-react';
+import { Activity, Bluetooth, BluetoothOff, Hand, Waves, TrendingUp, TrendingDown, ArrowLeft, ArrowRight, RotateCw, RotateCcw, Brain, ToggleLeft, ToggleRight } from 'lucide-react';
+import GestureClassifier from './ml/GestureClassifier';
+import GestureTrainer from './components/GestureTrainer';
 
 const GestureVisualizer = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -11,11 +13,30 @@ const GestureVisualizer = () => {
   });
   const [history, setHistory] = useState([]);
   const [error, setError] = useState('');
+  const [useML, setUseML] = useState(false);
+  const [mlConfidence, setMlConfidence] = useState(0);
+  const [mlPrediction, setMlPrediction] = useState(null);
+  const [showTrainer, setShowTrainer] = useState(false);
   const characteristicRef = useRef(null);
   const deviceRef = useRef(null);
+  const classifierRef = useRef(null);
 
   const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
   const CHAR_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+
+  const gestureNames = [
+    'IDLE', 'FIST', 'OPEN_HAND', 'WAVE_LEFT', 'WAVE_RIGHT',
+    'TILT_UP', 'TILT_DOWN', 'TILT_RIGHT', 'TILT_LEFT'
+  ];
+
+  // Initialize ML classifier
+  useEffect(() => {
+    const initClassifier = async () => {
+      classifierRef.current = new GestureClassifier();
+      await classifierRef.current.initialize();
+    };
+    initClassifier();
+  }, []);
 
   const gestureIcons = {
     0: <Activity className="w-12 h-12" />,
@@ -79,16 +100,46 @@ const GestureVisualizer = () => {
     parseData(value);
   };
 
-  const parseData = (data) => {
+  const parseData = async (data) => {
     try {
       // Format: "id:name|f1,f2,ax,ay,az,gx,gy,gz"
       const [gesturePart, sensorPart] = data.split('|');
       const [id, name] = gesturePart.split(':');
       const [f1, f2, ax, ay, az, gx, gy, gz] = sensorPart.split(',').map(Number);
 
-      const gesture = { id: parseInt(id), name };
+      const sensorDataObj = { flex1: f1, flex2: f2, ax, ay, az, gx, gy, gz };
+      setSensorData(sensorDataObj);
+
+      let gesture = { id: parseInt(id), name };
+      
+      // Use ML prediction if enabled and model is available
+      if (useML && classifierRef.current && classifierRef.current.model) {
+        try {
+          const prediction = await classifierRef.current.predict(sensorDataObj);
+          if (prediction.confidence > 0.5) { // Only use ML if confidence > 50%
+            gesture = {
+              id: prediction.gestureId,
+              name: gestureNames[prediction.gestureId] || 'UNKNOWN',
+              mlPredicted: true
+            };
+            setMlConfidence(prediction.confidence);
+            setMlPrediction(prediction);
+          } else {
+            // Fall back to ESP32 detection if ML confidence is low
+            setMlConfidence(0);
+            setMlPrediction(null);
+          }
+        } catch (err) {
+          console.error('ML prediction error:', err);
+          setMlConfidence(0);
+          setMlPrediction(null);
+        }
+      } else {
+        setMlConfidence(0);
+        setMlPrediction(null);
+      }
+
       setCurrentGesture(gesture);
-      setSensorData({ flex1: f1, flex2: f2, ax, ay, az, gx, gy, gz });
       
       setHistory(prev => {
         const newHistory = [{ ...gesture, timestamp: Date.now() }, ...prev];
@@ -124,7 +175,35 @@ const GestureVisualizer = () => {
           <h1 className="text-5xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
             Gesture Control
           </h1>
-          <p className="text-gray-400">Real-time ESP32 gesture visualization</p>
+          <p className="text-gray-400">Real-time ESP32 gesture visualization with ML</p>
+          
+          {/* ML Toggle */}
+          <div className="flex items-center justify-center gap-4 mt-4">
+            <span className={`text-sm ${!useML ? 'text-white' : 'text-gray-400'}`}>ESP32 Detection</span>
+            <button
+              onClick={() => setUseML(!useML)}
+              className={`relative w-14 h-7 rounded-full transition-colors ${
+                useML ? 'bg-purple-600' : 'bg-gray-600'
+              }`}
+            >
+              <div
+                className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
+                  useML ? 'translate-x-7' : 'translate-x-0'
+                }`}
+              />
+            </button>
+            <span className={`text-sm flex items-center gap-1 ${useML ? 'text-white' : 'text-gray-400'}`}>
+              <Brain className="w-4 h-4" />
+              ML Prediction
+            </span>
+            <button
+              onClick={() => setShowTrainer(!showTrainer)}
+              className="ml-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+            >
+              <Brain className="w-4 h-4" />
+              {showTrainer ? 'Hide' : 'Show'} Trainer
+            </button>
+          </div>
         </div>
 
         {/* Connection Button */}
@@ -162,8 +241,38 @@ const GestureVisualizer = () => {
             </div>
             <h2 className="text-6xl font-bold mb-2">{currentGesture.name}</h2>
             <p className="text-2xl opacity-80">Gesture ID: {currentGesture.id}</p>
+            {useML && mlConfidence > 0 && (
+              <div className="mt-4">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Brain className="w-5 h-5" />
+                  <span className="text-lg">ML Confidence: {(mlConfidence * 100).toFixed(1)}%</span>
+                </div>
+                <div className="w-full max-w-xs mx-auto h-2 bg-white/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-white/60 transition-all duration-300"
+                    style={{ width: `${mlConfidence * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {currentGesture.mlPredicted && (
+              <p className="text-sm mt-2 opacity-70">ML Predicted</p>
+            )}
           </div>
         </div>
+
+        {/* ML Trainer */}
+        {showTrainer && (
+          <div className="mb-8">
+            <GestureTrainer
+              sensorData={sensorData}
+              classifier={classifierRef.current}
+              onTrainingComplete={() => {
+                console.log('Training completed');
+              }}
+            />
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           {/* Flex Sensors */}
